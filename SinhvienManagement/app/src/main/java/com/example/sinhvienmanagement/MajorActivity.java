@@ -66,7 +66,35 @@ public class MajorActivity extends AppCompatActivity {
         btnAddMajor.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                add();
+                String name = etMajorName.getText().toString();
+
+                if (name.isEmpty()) {
+                    Toast.makeText(MajorActivity.this, "Please fill all fields", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                Major major = new Major(name);
+                try {
+                    Call<Major> call = apiService.addMajor(major);
+                    call.enqueue(new Callback<Major>() {
+                        @Override
+                        public void onResponse(Call<Major> call, Response<Major> response) {
+                            if (response.body() != null) {
+                                Toast.makeText(MajorActivity.this, "Add successfully",
+                                        Toast.LENGTH_LONG).show();
+                                fetchMajors();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<Major> call, Throwable t) {
+                            Toast.makeText(MajorActivity.this, "Add failed"
+                                    , Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.d("Loi", e.getMessage());
+                }
             }
         });
 
@@ -74,6 +102,11 @@ public class MajorActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 String name = etMajorName.getText().toString();
+
+                if (name.isEmpty()) {
+                    Toast.makeText(MajorActivity.this, "Please fill all fields", Toast.LENGTH_LONG).show();
+                    return;
+                }
 
                 Major major = new Major(name);
                 Call<Major> call = apiService.updateMajor(majorId, major);
@@ -120,32 +153,6 @@ public class MajorActivity extends AppCompatActivity {
         });
     }
 
-    private void add() {
-        String name = etMajorName.getText().toString();
-
-        Major major = new Major(name);
-        try {
-            Call<Major> call = apiService.addMajor(major);
-            call.enqueue(new Callback<Major>() {
-                @Override
-                public void onResponse(Call<Major> call, Response<Major> response) {
-                    if (response.body() != null) {
-                        Toast.makeText(MajorActivity.this, "Add successfully",
-                                Toast.LENGTH_LONG).show();
-                        fetchMajors();
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<Major> call, Throwable t) {
-                    Toast.makeText(MajorActivity.this, "Add failed"
-                            , Toast.LENGTH_LONG).show();
-                }
-            });
-        } catch (Exception e) {
-            Log.d("Loi", e.getMessage());
-        }
-    }
 
     private void fetchMajors() {
         Call<List<Major>> call = apiService.getAllMajors();

@@ -11,6 +11,7 @@ import android.widget.ListView;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
+import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -18,6 +19,12 @@ import androidx.core.view.WindowInsetsCompat;
 
 import com.example.sinhvienmanagement.Models.Major;
 import com.example.sinhvienmanagement.Models.Student;
+import com.google.android.gms.auth.api.signin.GoogleSignIn;
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
+import com.google.android.gms.auth.api.signin.GoogleSignInClient;
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
+import com.google.android.gms.tasks.OnCompleteListener;
+import com.google.android.gms.tasks.Task;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -38,10 +45,62 @@ public class MainActivity extends AppCompatActivity {
     EditText etName, etDate, etGender, etEmail, etAddress, etMajor;
     long studentId;
 
+
+    Button btnSignOut;
+    GoogleSignInOptions gso;
+    GoogleSignInClient gsc;
+
+    Button btnMap;
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+
+        gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN).requestEmail().build();
+        gsc = GoogleSignIn.getClient(this, gso);
+        GoogleSignInAccount account = GoogleSignIn.getLastSignedInAccount(this);
+        btnSignOut = findViewById(R.id.btnSignOut);
+        btnSignOut.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                gsc.signOut().addOnCompleteListener(new OnCompleteListener<Void>() {
+                    @Override
+                    public void onComplete(@NonNull Task<Void> task) {
+                        finish();
+                        Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+                        startActivity(intent);
+                    }
+                });
+            }
+        });
+
+        btnMap = findViewById(R.id.btnMap);
+        btnMap.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                Student selected = null;
+                for (Student student : studentList) {
+                    if (student.getId() == studentId) {
+                        selected = student;
+                        break;
+                    }
+                }
+
+                if (selected != null) {
+                    Intent intent = new Intent(MainActivity.this, MapsActivity.class);
+                    intent.putExtra("address", selected.getAddress());
+                    startActivity(intent);
+                } else {
+                    // Handle the case where no student is found
+                    Toast.makeText(MainActivity.this, "Student not found", Toast.LENGTH_SHORT).show();
+                }
+            }
+        });
+
+
 
         lvManagement = findViewById(R.id.lvManagement);
         studentList = new ArrayList<>();
@@ -112,7 +171,40 @@ public class MainActivity extends AppCompatActivity {
         btnAdd.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                add();
+                String name = etName.getText().toString();
+                String date = etDate.getText().toString();
+                String gender = etGender.getText().toString();
+                String email = etEmail.getText().toString();
+                String address = etAddress.getText().toString();
+                long majorId = Long.parseLong(etMajor.getText().toString());
+
+                if (name.isEmpty() || email.isEmpty() || gender.isEmpty() || email.isEmpty() || address.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "Please fill all fields", Toast.LENGTH_LONG).show();
+                    return;
+                }
+
+                Student student = new Student(name, date, gender, email, address, majorId);
+                try {
+                    Call<Student> call = apiService.addStudent(student);
+                    call.enqueue(new Callback<Student>() {
+                        @Override
+                        public void onResponse(Call<Student> call, Response<Student> response) {
+                            if (response.body() != null) {
+                                Toast.makeText(MainActivity.this, "Add successfully",
+                                        Toast.LENGTH_LONG).show();
+                                fetchStudentsAndMajors();
+                            }
+                        }
+
+                        @Override
+                        public void onFailure(Call<Student> call, Throwable t) {
+                            Toast.makeText(MainActivity.this, "Add failed"
+                                    , Toast.LENGTH_LONG).show();
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.d("Loi", e.getMessage());
+                }
             }
         });
         btnUpdate.setOnClickListener(new View.OnClickListener() {
@@ -124,6 +216,11 @@ public class MainActivity extends AppCompatActivity {
                 String email = etEmail.getText().toString();
                 String address = etAddress.getText().toString();
                 long majorId = Long.parseLong(etMajor.getText().toString());
+
+                if (name.isEmpty() || email.isEmpty() || gender.isEmpty() || email.isEmpty() || address.isEmpty()) {
+                    Toast.makeText(MainActivity.this, "Please fill all fields", Toast.LENGTH_LONG).show();
+                    return;
+                }
 
                 Student student = new Student(name, date, gender, email, address, majorId);
                 Call<Student> call = apiService.updateStudent(studentId, student);
@@ -154,37 +251,7 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
-    private void add() {
-        String name = etName.getText().toString();
-        String date = etDate.getText().toString();
-        String gender = etGender.getText().toString();
-        String email = etEmail.getText().toString();
-        String address = etAddress.getText().toString();
-        long majorId = Long.parseLong(etMajor.getText().toString());
 
-        Student student = new Student(name, date, gender, email, address, majorId);
-        try {
-            Call<Student> call = apiService.addStudent(student);
-            call.enqueue(new Callback<Student>() {
-                @Override
-                public void onResponse(Call<Student> call, Response<Student> response) {
-                    if (response.body() != null) {
-                        Toast.makeText(MainActivity.this, "Add successfully",
-                                Toast.LENGTH_LONG).show();
-                        fetchStudentsAndMajors();
-                    }
-                }
-
-                @Override
-                public void onFailure(Call<Student> call, Throwable t) {
-                    Toast.makeText(MainActivity.this, "Add failed"
-                            , Toast.LENGTH_LONG).show();
-                }
-            });
-        } catch (Exception e) {
-            Log.d("Loi", e.getMessage());
-        }
-    }
 
     private void fetchStudentsAndMajors() {
         Call<List<Student>> callStudents = apiService.getAllStudents();
@@ -204,11 +271,6 @@ public class MainActivity extends AppCompatActivity {
                                     majorMap.put(major.getIdMajor(), major.getNameMajor());
                                 }
                                 studentList.clear();
-//                                for (Student student : students) {
-//                                    student.setNameMajor(majorMap.get(student.getIdMajor()));
-//
-//                                    studentList.add(student);
-//                                }
 
                                 List<Student> studentsWithMajors = new ArrayList<>();
 
